@@ -5,3 +5,5 @@
 Cargo.lock
 *.wasm
 .DS_Store
+wrangler.toml
+.dev.vars
