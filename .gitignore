@@ -1,0 +1,7 @@
+/target
+/build
+/worker-ui/dist
+/.wrangler
+Cargo.lock
+*.wasm
+.DS_Store

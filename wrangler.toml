@@ -1,0 +1,16 @@
+name = "fullstack-worker"
+main = "worker-api/build/worker/shim.mjs"
+compatibility_date = "2024-01-01"
+
+[build]
+command = "cargo install -q worker-build && cd worker-api && worker-build --release"
+cwd = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "items-db"
+database_id = "local"
+migrations_dir = "migrations"
+
+[site]
+bucket = "./worker-ui/dist"
