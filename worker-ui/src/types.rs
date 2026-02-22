@@ -37,7 +37,12 @@ pub struct PaginationMeta {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct ListMeta {
+    pub pagination: PaginationMeta,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct ListResponse<T> {
     pub data: Vec<T>,
-    pub pagination: PaginationMeta,
+    pub meta: ListMeta,
 }

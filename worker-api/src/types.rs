@@ -68,14 +68,22 @@ impl PaginationMeta {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ListMeta {
+    pub pagination: PaginationMeta,
+}
+
 #[derive(Debug, Serialize)]
 pub struct ListResponse<T> {
     pub data: Vec<T>,
-    pub pagination: PaginationMeta,
+    pub meta: ListMeta,
 }
 
 impl<T> ListResponse<T> {
     pub fn new(data: Vec<T>, pagination: PaginationMeta) -> Self {
-        Self { data, pagination }
+        Self {
+            data,
+            meta: ListMeta { pagination },
+        }
     }
 }
