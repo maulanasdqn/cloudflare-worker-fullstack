@@ -1,0 +1,4 @@
+[ui]
+components_path = "src/components/ui"
+hooks_path = "src/hooks"
+lib_path = "src/lib"

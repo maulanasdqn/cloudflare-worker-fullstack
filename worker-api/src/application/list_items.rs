@@ -1,6 +1,6 @@
-use crate::domain::{DynItemRepository, PaginatedResult, Item};
+use crate::domain::{DynItemRepository, PaginatedResult, Item, QueryOptions};
 use crate::errors::AppError;
-use crate::types::PaginationParams;
+use crate::types::ListQueryParams;
 
 pub struct ListItems {
     repo: DynItemRepository,
@@ -11,9 +11,11 @@ impl ListItems {
         Self { repo }
     }
 
-    pub async fn execute(&self, params: PaginationParams) -> Result<PaginatedResult<Item>, AppError> {
-        let limit = params.per_page();
-        let offset = params.offset();
-        self.repo.find_all(limit, offset).await
+    pub async fn execute(&self, params: ListQueryParams) -> Result<PaginatedResult<Item>, AppError> {
+        let options = QueryOptions::new(params.per_page(), params.offset())
+            .with_search(params.search.clone())
+            .with_sort(params.sort_by(), params.sort_order());
+
+        self.repo.find_all(options).await
     }
 }

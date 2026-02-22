@@ -2,8 +2,9 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use worker::D1Database;
 
-use crate::domain::{CreateItemInput, Item, ItemRepository, PaginatedResult, UpdateItemInput};
+use crate::domain::{CreateItemInput, Item, ItemRepository, PaginatedResult, QueryOptions, UpdateItemInput};
 use crate::errors::AppError;
+use crate::types::SortOrder;
 
 pub struct D1ItemRepository {
     db: D1Database,
@@ -12,6 +13,13 @@ pub struct D1ItemRepository {
 impl D1ItemRepository {
     pub fn new(db: D1Database) -> Self {
         Self { db }
+    }
+
+    fn validate_sort_field(field: &str) -> &str {
+        match field {
+            "id" | "name" | "created_at" => field,
+            _ => "created_at",
+        }
     }
 }
 
@@ -51,15 +59,44 @@ impl ItemRepository for D1ItemRepository {
             .map_err(|e| AppError::InternalError(e.to_string()))
     }
 
-    async fn find_all(&self, limit: u32, offset: u32) -> Result<PaginatedResult<Item>, AppError> {
-        let total = self.count().await?;
+    async fn find_all(&self, options: QueryOptions) -> Result<PaginatedResult<Item>, AppError> {
+        let total = self.count(options.search.as_deref()).await?;
 
-        let stmt = self
-            .db
-            .prepare("SELECT * FROM items ORDER BY created_at DESC LIMIT ?1 OFFSET ?2");
+        let sort_field = Self::validate_sort_field(&options.sort_by);
+        let sort_dir = match options.sort_order {
+            SortOrder::Asc => "ASC",
+            SortOrder::Desc => "DESC",
+        };
 
+        let (query, bindings) = if let Some(ref search) = options.search {
+            let search_pattern = format!("%{}%", search);
+            (
+                format!(
+                    "SELECT * FROM items WHERE name LIKE ?1 OR description LIKE ?1 ORDER BY {} {} LIMIT ?2 OFFSET ?3",
+                    sort_field, sort_dir
+                ),
+                vec![
+                    search_pattern.into(),
+                    (options.limit as f64).into(),
+                    (options.offset as f64).into(),
+                ],
+            )
+        } else {
+            (
+                format!(
+                    "SELECT * FROM items ORDER BY {} {} LIMIT ?1 OFFSET ?2",
+                    sort_field, sort_dir
+                ),
+                vec![
+                    (options.limit as f64).into(),
+                    (options.offset as f64).into(),
+                ],
+            )
+        };
+
+        let stmt = self.db.prepare(&query);
         let stmt = stmt
-            .bind(&[(limit as f64).into(), (offset as f64).into()])
+            .bind(&bindings)
             .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         let result = stmt
@@ -74,8 +111,24 @@ impl ItemRepository for D1ItemRepository {
         Ok(PaginatedResult { items, total })
     }
 
-    async fn count(&self) -> Result<u64, AppError> {
-        let stmt = self.db.prepare("SELECT COUNT(*) as count FROM items");
+    async fn count(&self, search: Option<&str>) -> Result<u64, AppError> {
+        let (query, bindings) = if let Some(search) = search {
+            let search_pattern = format!("%{}%", search);
+            (
+                "SELECT COUNT(*) as count FROM items WHERE name LIKE ?1 OR description LIKE ?1",
+                vec![search_pattern.into()],
+            )
+        } else {
+            ("SELECT COUNT(*) as count FROM items", vec![])
+        };
+
+        let stmt = self.db.prepare(query);
+        let stmt = if bindings.is_empty() {
+            stmt
+        } else {
+            stmt.bind(&bindings)
+                .map_err(|e| AppError::InternalError(e.to_string()))?
+        };
 
         let result = stmt
             .first::<CountResult>(None)

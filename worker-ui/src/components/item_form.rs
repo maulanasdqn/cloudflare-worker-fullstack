@@ -4,6 +4,7 @@ use serde_json::json;
 use zod_rs::prelude::*;
 
 use crate::api;
+use crate::components::ui::{Button, ButtonVariant, Label};
 use crate::types::{CreateItemRequest, Item, UpdateItemRequest};
 
 fn create_item_schema() -> impl Schema<serde_json::Value> {
@@ -143,7 +144,7 @@ where
     view! {
         <form on:submit=on_submit class="space-y-4">
             {move || error.get().map(|e| view! {
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                <div class="bg-destructive/15 border border-destructive/50 text-destructive px-4 py-3 rounded-md text-sm">
                     {e}
                 </div>
             })}
@@ -152,7 +153,7 @@ where
                 let errors = validation_errors.get();
                 if !errors.is_empty() {
                     Some(view! {
-                        <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+                        <div class="bg-yellow-500/15 border border-yellow-500/50 text-yellow-500 px-4 py-3 rounded-md text-sm">
                             <ul class="list-disc list-inside">
                                 {errors.into_iter().map(|e| view! { <li>{e}</li> }).collect::<Vec<_>>()}
                             </ul>
@@ -163,11 +164,12 @@ where
                 }
             }}
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">"Name"</label>
+            <div class="space-y-2">
+                <Label html_for="name".to_string()>"Name"</Label>
                 <input
                     type="text"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    id="name"
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     placeholder="Enter item name"
                     maxlength="255"
                     prop:value=move || name.get()
@@ -175,15 +177,16 @@ where
                     on:blur=validate_name
                     required
                 />
-                <div class="text-xs text-gray-500 mt-1">
+                <div class="text-xs text-muted-foreground">
                     {move || format!("{}/255 characters", name_char_count())}
                 </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">"Description"</label>
+            <div class="space-y-2">
+                <Label html_for="description".to_string()>"Description"</Label>
                 <textarea
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    id="description"
+                    class="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     placeholder="Enter description (optional)"
                     rows="3"
                     maxlength="1000"
@@ -191,7 +194,7 @@ where
                     on:input=move |ev| set_description.set(event_target_value(&ev))
                     on:blur=validate_description
                 ></textarea>
-                <div class="text-xs text-gray-500 mt-1">
+                <div class="text-xs text-muted-foreground">
                     {move || format!("{}/1000 characters", desc_char_count())}
                 </div>
             </div>
@@ -199,7 +202,7 @@ where
             <div class="flex gap-2">
                 <button
                     type="submit"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
                     disabled=move || submitting.get() || !validation_errors.get().is_empty()
                 >
                     {move || {
@@ -214,13 +217,12 @@ where
                 </button>
 
                 {move || editing_item.get().map(|_| view! {
-                    <button
-                        type="button"
-                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                    <Button
+                        variant=ButtonVariant::Outline
                         on:click=move |_| set_editing_item.set(None)
                     >
                         "Cancel"
-                    </button>
+                    </Button>
                 })}
             </div>
         </form>

@@ -3,6 +3,9 @@ name = "worker-ui"
 version = "0.1.0"
 edition = "2021"
 
+[package.metadata.leptos]
+tailwind-input-file = "style/tailwind.css"
+
 [dependencies]
 leptos.workspace = true
 serde.workspace = true
@@ -13,3 +16,4 @@ wasm-bindgen-futures.workspace = true
 console_error_panic_hook = "0.1"
 zod-rs = "0.4"
 zod-rs-util = "0.4"
+strum.workspace = true

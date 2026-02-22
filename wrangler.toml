@@ -9,12 +9,12 @@ cwd = "."
 [[d1_databases]]
 binding = "DB"
 database_name = "items-db"
-database_id = "local"
+database_id = "c36f26a5-988e-4a26-aeb6-5a7d029f59e8"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
-id = "rate-limit-store"
+id = "921fa62eaa4c4b0f8df4c857126699e2"
 
 [site]
 bucket = "./worker-ui/dist"

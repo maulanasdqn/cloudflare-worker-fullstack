@@ -65,12 +65,22 @@ fn add_rate_limit_headers(response: Response, limit: u32, remaining: u32, reset:
     response.with_headers(headers)
 }
 
-async fn serve_static(req: Request, env: Env) -> worker::Result<Response> {
-    let path = req.path();
-    let asset_path = if path == "/" { "/index.html" } else { &path };
+async fn serve_static(_req: Request, env: Env, path: &str) -> worker::Result<Response> {
+    let asset_path = if path == "/" || path.is_empty() { "index.html" } else { path.trim_start_matches('/') };
+
+    let kv = env.kv("__STATIC_CONTENT")?;
+
+    let base_name = asset_path
+        .trim_end_matches(".html")
+        .trim_end_matches(".js")
+        .trim_end_matches(".wasm")
+        .trim_end_matches(".css");
+
+    let keys = kv.list().prefix(base_name.to_string()).execute().await?;
+    let kv_key = keys.keys.first().map(|k| k.name.clone()).unwrap_or_else(|| asset_path.to_string());
 
     let content_type = if asset_path.ends_with(".html") {
-        "text/html"
+        "text/html; charset=utf-8"
     } else if asset_path.ends_with(".js") {
         "application/javascript"
     } else if asset_path.ends_with(".wasm") {
@@ -83,31 +93,30 @@ async fn serve_static(req: Request, env: Env) -> worker::Result<Response> {
 
     let is_binary = asset_path.ends_with(".wasm");
 
-    let response = match env.kv("__STATIC_CONTENT") {
-        Ok(kv) => {
-            if is_binary {
-                match kv.get(asset_path).bytes().await? {
-                    Some(bytes) => {
-                        let resp = Response::from_bytes(bytes)?;
-                        let headers = resp.headers().clone();
-                        let _ = headers.set("Content-Type", content_type);
-                        resp.with_headers(headers)
-                    }
-                    None => Response::error("Not Found", 404)?,
-                }
-            } else {
-                match kv.get(asset_path).text().await? {
-                    Some(content) => {
-                        let resp = Response::ok(content)?;
-                        let headers = resp.headers().clone();
-                        let _ = headers.set("Content-Type", content_type);
-                        resp.with_headers(headers)
-                    }
-                    None => Response::error("Not Found", 404)?,
-                }
+    let response = if is_binary {
+        match kv.get(&kv_key).bytes().await? {
+            Some(bytes) => {
+                let resp = Response::from_bytes(bytes)?;
+                let headers = resp.headers().clone();
+                let _ = headers.set("Content-Type", content_type);
+                let _ = headers.set("Cache-Control", "public, max-age=31536000, immutable");
+                resp.with_headers(headers)
             }
+            None => Response::error("Not Found", 404)?,
         }
-        Err(_) => Response::error("Static content not available", 500)?,
+    } else {
+        match kv.get(&kv_key).text().await? {
+            Some(content) => {
+                let resp = Response::ok(content)?;
+                let headers = resp.headers().clone();
+                let _ = headers.set("Content-Type", content_type);
+                if !asset_path.ends_with(".html") {
+                    let _ = headers.set("Cache-Control", "public, max-age=31536000, immutable");
+                }
+                resp.with_headers(headers)
+            }
+            None => Response::error("Not Found", 404)?,
+        }
     };
 
     Ok(add_security_headers(response, false))
@@ -189,6 +198,6 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> worker::Result<Respo
     if path.starts_with("/api/") {
         handle_api_request(req, env).await
     } else {
-        serve_static(req, env).await
+        serve_static(req, env, &path).await
     }
 }

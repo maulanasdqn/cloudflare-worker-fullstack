@@ -2,35 +2,94 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 
 use crate::api;
+use crate::components::ui::{
+    Button, ButtonSize, ButtonVariant, Table, TableBody, TableCell, TableHeader, TableRow,
+};
 use crate::types::Item;
 
 #[component]
-pub fn ItemList(
+pub fn SortableHeader<F>(
+    label: &'static str,
+    column: &'static str,
+    sort_by: ReadSignal<String>,
+    sort_order: ReadSignal<String>,
+    on_click: F,
+) -> impl IntoView
+where
+    F: Fn() + Copy + 'static,
+{
+    let is_active = move || sort_by.get() == column;
+    let arrow = move || {
+        if is_active() {
+            if sort_order.get() == "asc" { " ↑" } else { " ↓" }
+        } else {
+            ""
+        }
+    };
+
+    view! {
+        <th
+            class="h-10 px-2 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none"
+            on:click=move |_| on_click()
+        >
+            <span class=move || if is_active() { "text-foreground" } else { "" }>
+                {label}{arrow}
+            </span>
+        </th>
+    }
+}
+
+#[component]
+pub fn ItemList<F>(
     items: ReadSignal<Vec<Item>>,
     set_items: WriteSignal<Vec<Item>>,
     set_editing_item: WriteSignal<Option<Item>>,
-) -> impl IntoView {
+    sort_by: ReadSignal<String>,
+    sort_order: ReadSignal<String>,
+    on_sort: F,
+) -> impl IntoView
+where
+    F: Fn(&'static str) -> Box<dyn Fn()> + Copy + Send + Sync + 'static,
+{
     view! {
-        <div class="space-y-4">
+        <div>
             {move || {
                 let items_list = items.get();
                 if items_list.is_empty() {
                     view! {
-                        <p class="text-gray-500 text-center py-4">"No items yet. Create one above!"</p>
+                        <p class="text-muted-foreground text-center py-8">"No items found."</p>
                     }.into_any()
                 } else {
                     view! {
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">"ID"</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">"Name"</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">"Description"</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">"Created"</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">"Actions"</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <SortableHeader
+                                        label="ID"
+                                        column="id"
+                                        sort_by=sort_by
+                                        sort_order=sort_order
+                                        on_click=move || (on_sort("id"))()
+                                    />
+                                    <SortableHeader
+                                        label="Name"
+                                        column="name"
+                                        sort_by=sort_by
+                                        sort_order=sort_order
+                                        on_click=move || (on_sort("name"))()
+                                    />
+                                    <th class="h-10 px-2 text-left align-middle font-medium text-muted-foreground">"Description"</th>
+                                    <SortableHeader
+                                        label="Created"
+                                        column="created_at"
+                                        sort_by=sort_by
+                                        sort_order=sort_order
+                                        on_click=move || (on_sort("created_at"))()
+                                    />
+                                    <th class="h-10 px-2 text-right align-middle font-medium text-muted-foreground">"Actions"</th>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
                                 <For
                                     each=move || items.get()
                                     key=|item| item.id
@@ -38,42 +97,46 @@ pub fn ItemList(
                                         let item_for_edit = item.clone();
                                         let item_id = item.id;
                                         view! {
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.id}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.name.clone()}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <TableRow>
+                                                <TableCell class="font-medium".to_string()>{item.id}</TableCell>
+                                                <TableCell>{item.name.clone()}</TableCell>
+                                                <TableCell class="text-muted-foreground".to_string()>
                                                     {item.description.clone().unwrap_or_else(|| "-".to_string())}
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.created_at.clone()}</td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                                                    <button
-                                                        class="text-blue-600 hover:text-blue-900"
-                                                        on:click={
-                                                            let item_clone = item_for_edit.clone();
-                                                            move |_| set_editing_item.set(Some(item_clone.clone()))
-                                                        }
-                                                    >
-                                                        "Edit"
-                                                    </button>
-                                                    <button
-                                                        class="text-red-600 hover:text-red-900"
-                                                        on:click=move |_| {
-                                                            spawn_local(async move {
-                                                                if api::delete_item(item_id).await.is_ok() {
-                                                                    set_items.update(|items| items.retain(|i| i.id != item_id));
-                                                                }
-                                                            });
-                                                        }
-                                                    >
-                                                        "Delete"
-                                                    </button>
-                                                </td>
-                                            </tr>
+                                                </TableCell>
+                                                <TableCell class="text-muted-foreground".to_string()>{item.created_at.clone()}</TableCell>
+                                                <TableCell class="text-right".to_string()>
+                                                    <div class="flex justify-end gap-2">
+                                                        <Button
+                                                            variant=ButtonVariant::Ghost
+                                                            size=ButtonSize::Sm
+                                                            on:click={
+                                                                let item_clone = item_for_edit.clone();
+                                                                move |_| set_editing_item.set(Some(item_clone.clone()))
+                                                            }
+                                                        >
+                                                            "Edit"
+                                                        </Button>
+                                                        <Button
+                                                            variant=ButtonVariant::Destructive
+                                                            size=ButtonSize::Sm
+                                                            on:click=move |_| {
+                                                                spawn_local(async move {
+                                                                    if api::delete_item(item_id).await.is_ok() {
+                                                                        set_items.update(|items| items.retain(|i| i.id != item_id));
+                                                                    }
+                                                                });
+                                                            }
+                                                        >
+                                                            "Delete"
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
                                         }
                                     }
                                 />
-                            </tbody>
-                        </table>
+                            </TableBody>
+                        </Table>
                     }.into_any()
                 }
             }}
