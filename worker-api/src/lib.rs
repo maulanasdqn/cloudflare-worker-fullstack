@@ -166,11 +166,11 @@ async fn handle_api_request(req: Request, env: Env) -> worker::Result<Response> 
     let repo: Arc<dyn ItemRepository> = Arc::new(D1ItemRepository::new(db));
 
     let router = Router::with_data(repo)
-        .get_async("/api/items", list_items_handler)
-        .post_async("/api/items", create_item_handler)
-        .get_async("/api/items/:id", get_item_handler)
-        .put_async("/api/items/:id", update_item_handler)
-        .delete_async("/api/items/:id", delete_item_handler);
+        .get_async("/api/v1/items", list_items_handler)
+        .post_async("/api/v1/items", create_item_handler)
+        .get_async("/api/v1/items/:id", get_item_handler)
+        .put_async("/api/v1/items/:id", update_item_handler)
+        .delete_async("/api/v1/items/:id", delete_item_handler);
 
     let response = router.run(req, env).await?;
     let response = add_security_headers(response, true);

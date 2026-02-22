@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize)]
 pub struct SingleResponse<T> {
@@ -15,15 +15,67 @@ impl<T> SingleResponse<T> {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct PaginationParams {
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+}
+
+impl Default for PaginationParams {
+    fn default() -> Self {
+        Self {
+            page: Some(1),
+            per_page: Some(10),
+        }
+    }
+}
+
+impl PaginationParams {
+    pub fn page(&self) -> u32 {
+        self.page.unwrap_or(1).max(1)
+    }
+
+    pub fn per_page(&self) -> u32 {
+        self.per_page.unwrap_or(10).clamp(1, 100)
+    }
+
+    pub fn offset(&self) -> u32 {
+        (self.page() - 1) * self.per_page()
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PaginationMeta {
+    pub page: u32,
+    pub per_page: u32,
+    pub total: u64,
+    pub total_pages: u32,
+    pub has_next: bool,
+    pub has_prev: bool,
+}
+
+impl PaginationMeta {
+    pub fn new(page: u32, per_page: u32, total: u64) -> Self {
+        let total_pages = ((total as f64) / (per_page as f64)).ceil() as u32;
+        Self {
+            page,
+            per_page,
+            total,
+            total_pages,
+            has_next: page < total_pages,
+            has_prev: page > 1,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct ListResponse<T> {
     pub data: Vec<T>,
-    pub count: usize,
+    pub pagination: PaginationMeta,
 }
 
 impl<T> ListResponse<T> {
-    pub fn new(data: Vec<T>) -> Self {
-        let count = data.len();
-        Self { data, count }
+    pub fn new(data: Vec<T>, pagination: PaginationMeta) -> Self {
+        Self { data, pagination }
     }
 }

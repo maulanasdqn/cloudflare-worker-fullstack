@@ -27,7 +27,17 @@ pub struct SingleResponse<T> {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct PaginationMeta {
+    pub page: u32,
+    pub per_page: u32,
+    pub total: u64,
+    pub total_pages: u32,
+    pub has_next: bool,
+    pub has_prev: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct ListResponse<T> {
     pub data: Vec<T>,
-    pub count: usize,
+    pub pagination: PaginationMeta,
 }

@@ -1,7 +1,8 @@
 use async_trait::async_trait;
+use serde::Deserialize;
 use worker::D1Database;
 
-use crate::domain::{CreateItemInput, Item, ItemRepository, UpdateItemInput};
+use crate::domain::{CreateItemInput, Item, ItemRepository, PaginatedResult, UpdateItemInput};
 use crate::errors::AppError;
 
 pub struct D1ItemRepository {
@@ -12,6 +13,11 @@ impl D1ItemRepository {
     pub fn new(db: D1Database) -> Self {
         Self { db }
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct CountResult {
+    count: i64,
 }
 
 #[async_trait(?Send)]
@@ -45,19 +51,41 @@ impl ItemRepository for D1ItemRepository {
             .map_err(|e| AppError::InternalError(e.to_string()))
     }
 
-    async fn find_all(&self) -> Result<Vec<Item>, AppError> {
+    async fn find_all(&self, limit: u32, offset: u32) -> Result<PaginatedResult<Item>, AppError> {
+        let total = self.count().await?;
+
         let stmt = self
             .db
-            .prepare("SELECT * FROM items ORDER BY created_at DESC");
+            .prepare("SELECT * FROM items ORDER BY created_at DESC LIMIT ?1 OFFSET ?2");
+
+        let stmt = stmt
+            .bind(&[(limit as f64).into(), (offset as f64).into()])
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         let result = stmt
             .all()
             .await
             .map_err(|e| AppError::InternalError(e.to_string()))?;
 
-        result
+        let items = result
             .results::<Item>()
-            .map_err(|e| AppError::InternalError(e.to_string()))
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+        Ok(PaginatedResult { items, total })
+    }
+
+    async fn count(&self) -> Result<u64, AppError> {
+        let stmt = self.db.prepare("SELECT COUNT(*) as count FROM items");
+
+        let result = stmt
+            .first::<CountResult>(None)
+            .await
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+        match result {
+            Some(r) => Ok(r.count as u64),
+            None => Ok(0),
+        }
     }
 
     async fn update(&self, id: i64, input: UpdateItemInput) -> Result<Item, AppError> {

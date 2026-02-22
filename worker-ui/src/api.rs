@@ -2,7 +2,7 @@ use gloo_net::http::Request;
 
 use crate::types::{CreateItemRequest, Item, ListResponse, SingleResponse, UpdateItemRequest};
 
-const API_BASE: &str = "/api";
+const API_BASE: &str = "/api/v1";
 
 pub async fn fetch_items() -> Result<Vec<Item>, String> {
     let response = Request::get(&format!("{}/items", API_BASE))
