@@ -10,7 +10,7 @@ cwd = "."
 binding = "DB"
 database_name = "items-db"
 database_id = "<YOUR_D1_DATABASE_ID>"
-migrations_dir = "migrations"
+migrations_dir = "worker-migrations"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
