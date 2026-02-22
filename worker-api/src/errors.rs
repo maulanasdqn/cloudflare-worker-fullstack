@@ -46,6 +46,23 @@ impl std::fmt::Display for AppError {
     }
 }
 
+impl AppError {
+    pub fn to_response(&self) -> Response {
+        Response::from(self.clone())
+    }
+}
+
+impl Clone for AppError {
+    fn clone(&self) -> Self {
+        match self {
+            AppError::NotFound(msg) => AppError::NotFound(msg.clone()),
+            AppError::BadRequest(msg) => AppError::BadRequest(msg.clone()),
+            AppError::ValidationError(msg) => AppError::ValidationError(msg.clone()),
+            AppError::InternalError(msg) => AppError::InternalError(msg.clone()),
+        }
+    }
+}
+
 impl From<worker::Error> for AppError {
     fn from(err: worker::Error) -> Self {
         AppError::InternalError(err.to_string())

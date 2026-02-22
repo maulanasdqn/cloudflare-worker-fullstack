@@ -12,5 +12,9 @@ database_name = "items-db"
 database_id = "local"
 migrations_dir = "migrations"
 
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "rate-limit-store"
+
 [site]
 bucket = "./worker-ui/dist"

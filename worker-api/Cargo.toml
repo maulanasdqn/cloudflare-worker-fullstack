@@ -14,3 +14,5 @@ async-trait.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true
+zod-rs = "0.4"
+zod-rs-util = "0.4"

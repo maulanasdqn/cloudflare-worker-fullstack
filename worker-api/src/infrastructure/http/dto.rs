@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
+use zod_rs::prelude::*;
 
 use crate::domain::{CreateItemInput, Item, UpdateItemInput};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ZodSchema)]
 pub struct CreateItemRequest {
+    #[zod(min_length(1), max_length(255))]
     pub name: String,
+    #[zod(max_length(1000))]
     pub description: Option<String>,
 }
 
@@ -17,9 +20,11 @@ impl From<CreateItemRequest> for CreateItemInput {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ZodSchema)]
 pub struct UpdateItemRequest {
+    #[zod(min_length(1), max_length(255))]
     pub name: Option<String>,
+    #[zod(max_length(1000))]
     pub description: Option<String>,
 }
 
@@ -49,4 +54,10 @@ impl From<Item> for ItemResponse {
             created_at: item.created_at,
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct ValidationErrorResponse {
+    pub message: String,
+    pub errors: Vec<String>,
 }

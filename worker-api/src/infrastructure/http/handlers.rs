@@ -1,13 +1,26 @@
+use serde_json::Value;
 use worker::{Request, Response, RouteContext};
+use zod_rs::prelude::*;
+use zod_rs_util::ValidationIssue;
 
 use crate::application::{CreateItem, DeleteItem, GetItem, ListItems, UpdateItem};
 use crate::domain::DynItemRepository;
 use crate::errors::AppError;
-use crate::infrastructure::http::dto::{CreateItemRequest, ItemResponse, UpdateItemRequest};
+use crate::infrastructure::http::dto::{
+    CreateItemRequest, ItemResponse, UpdateItemRequest, ValidationErrorResponse,
+};
 use crate::types::{ListResponse, SingleResponse};
 
 fn handle_error(err: AppError) -> worker::Result<Response> {
     Ok(Response::from(err))
+}
+
+fn handle_validation_error(errors: Vec<String>) -> worker::Result<Response> {
+    let response = ValidationErrorResponse {
+        message: "Validation failed".to_string(),
+        errors,
+    };
+    Response::from_json(&response).map(|r| r.with_status(400))
 }
 
 pub async fn list_items_handler(
@@ -32,7 +45,8 @@ pub async fn get_item_handler(
 ) -> worker::Result<Response> {
     let id: i64 = match ctx.param("id") {
         Some(id_str) => match id_str.parse() {
-            Ok(id) => id,
+            Ok(id) if id > 0 => id,
+            Ok(_) => return handle_error(AppError::BadRequest("Id must be positive".into())),
             Err(_) => return handle_error(AppError::BadRequest("Invalid id parameter".into())),
         },
         None => return handle_error(AppError::BadRequest("Missing id parameter".into())),
@@ -53,19 +67,32 @@ pub async fn create_item_handler(
     mut req: Request,
     ctx: RouteContext<DynItemRepository>,
 ) -> worker::Result<Response> {
-    let payload: CreateItemRequest = match req.json().await {
-        Ok(p) => p,
+    let json_value: Value = match req.json().await {
+        Ok(v) => v,
         Err(e) => return handle_error(AppError::BadRequest(e.to_string())),
     };
 
-    let repo = ctx.data;
-    let use_case = CreateItem::new(repo);
+    match CreateItemRequest::validate_and_parse(&json_value) {
+        Ok(payload) => {
+            let repo = ctx.data;
+            let use_case = CreateItem::new(repo);
 
-    match use_case.execute(payload.into()).await {
-        Ok(item) => {
-            Response::from_json(&SingleResponse::new(ItemResponse::from(item), "Item created"))
+            match use_case.execute(payload.into()).await {
+                Ok(item) => Response::from_json(&SingleResponse::new(
+                    ItemResponse::from(item),
+                    "Item created",
+                )),
+                Err(e) => handle_error(e),
+            }
         }
-        Err(e) => handle_error(e),
+        Err(validation_result) => {
+            let errors: Vec<String> = validation_result
+                .issues
+                .iter()
+                .map(|issue: &ValidationIssue| issue.to_string())
+                .collect();
+            handle_validation_error(errors)
+        }
     }
 }
 
@@ -75,25 +102,39 @@ pub async fn update_item_handler(
 ) -> worker::Result<Response> {
     let id: i64 = match ctx.param("id") {
         Some(id_str) => match id_str.parse() {
-            Ok(id) => id,
+            Ok(id) if id > 0 => id,
+            Ok(_) => return handle_error(AppError::BadRequest("Id must be positive".into())),
             Err(_) => return handle_error(AppError::BadRequest("Invalid id parameter".into())),
         },
         None => return handle_error(AppError::BadRequest("Missing id parameter".into())),
     };
 
-    let payload: UpdateItemRequest = match req.json().await {
-        Ok(p) => p,
+    let json_value: Value = match req.json().await {
+        Ok(v) => v,
         Err(e) => return handle_error(AppError::BadRequest(e.to_string())),
     };
 
-    let repo = ctx.data;
-    let use_case = UpdateItem::new(repo);
+    match UpdateItemRequest::validate_and_parse(&json_value) {
+        Ok(payload) => {
+            let repo = ctx.data;
+            let use_case = UpdateItem::new(repo);
 
-    match use_case.execute(id, payload.into()).await {
-        Ok(item) => {
-            Response::from_json(&SingleResponse::new(ItemResponse::from(item), "Item updated"))
+            match use_case.execute(id, payload.into()).await {
+                Ok(item) => Response::from_json(&SingleResponse::new(
+                    ItemResponse::from(item),
+                    "Item updated",
+                )),
+                Err(e) => handle_error(e),
+            }
         }
-        Err(e) => handle_error(e),
+        Err(validation_result) => {
+            let errors: Vec<String> = validation_result
+                .issues
+                .iter()
+                .map(|issue: &ValidationIssue| issue.to_string())
+                .collect();
+            handle_validation_error(errors)
+        }
     }
 }
 
@@ -103,7 +144,8 @@ pub async fn delete_item_handler(
 ) -> worker::Result<Response> {
     let id: i64 = match ctx.param("id") {
         Some(id_str) => match id_str.parse() {
-            Ok(id) => id,
+            Ok(id) if id > 0 => id,
+            Ok(_) => return handle_error(AppError::BadRequest("Id must be positive".into())),
             Err(_) => return handle_error(AppError::BadRequest("Invalid id parameter".into())),
         },
         None => return handle_error(AppError::BadRequest("Missing id parameter".into())),
